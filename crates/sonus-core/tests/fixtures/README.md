@@ -14,3 +14,18 @@ Reconstructed 2026-07-30 from field evidence, not guesses:
 
 S4 (live-fire) replaces/augments these with real captured response JSON —
 that's the slice's explicit deliverable.
+
+## The S4 live capture (2026-07-30) — `record_info_success_live.json`
+
+Verbatim `GET /generate/record-info` for task
+`bb69b305b057b6182f2292496372801c` — **APEX's first real compose through
+Sonus-RS** ("Same Voice, New Bones", apex-3, model V5/chirp-crow, the
+counted run). The reference truth the parsers are tested against.
+
+What it proved beyond the reconstruction: `data.param` echoes our exact
+request body (camelCase + the localhost callBackUrl, accepted in
+production); `status` arrives UPPERCASE; `errorCode`/`errorMessage` are
+present-but-null on success; `sourceAudioUrl` is now the real Suno CDN
+(`cdn1.suno.ai`) while `audioUrl` is the relay — both unauthenticated.
+The reconstructed fixtures stay: they cover shapes (hermes mocks, failure
+statuses) the happy path can't.

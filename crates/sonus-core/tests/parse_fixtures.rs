@@ -22,6 +22,9 @@ fn fx(name: &str) -> Value {
         "record_info_tracks_no_status" => {
             include_str!("fixtures/record_info_tracks_no_status.json")
         }
+        "record_info_success_live" => {
+            include_str!("fixtures/record_info_success_live.json")
+        }
         "credits_number" => include_str!("fixtures/credits_number.json"),
         "credits_object" => include_str!("fixtures/credits_object.json"),
         other => panic!("unknown fixture {other}"),
@@ -86,6 +89,42 @@ fn success_snapshot_carries_both_variants() {
     assert_eq!(t.tags.as_deref(), Some("orchestral cinematic mystical"));
     assert_eq!(info.tracks[1].duration, Some(172.72));
     assert!(info.error_message.is_none());
+}
+
+/// THE reference truth: APEX's first real compose through Sonus-RS
+/// ("Same Voice, New Bones", apex-3, 2026-07-30) — the S4 live capture,
+/// verbatim from GET /generate/record-info. If a parser change breaks this
+/// test, it breaks against reality, not against a reconstruction.
+#[test]
+fn live_capture_parses_field_for_field() {
+    let info = parse_record_info(&fx("record_info_success_live")).unwrap();
+    assert_eq!(
+        info.task_id.as_deref(),
+        Some("bb69b305b057b6182f2292496372801c")
+    );
+    // upstream sends "SUCCESS" uppercase — normalization proven live
+    assert_eq!(info.status, TaskStatus::Success);
+    assert!(info.status.is_terminal());
+    // null errorCode/errorMessage fields must parse as absent, not break
+    assert!(info.error_message.is_none());
+
+    assert_eq!(info.tracks.len(), 2, "two variants per generation");
+    let t = &info.tracks[0];
+    assert_eq!(
+        t.id.as_deref(),
+        Some("5912d65c-2dbc-4612-951f-71315ac48d83")
+    );
+    assert_eq!(t.title, "Same Voice, New Bones");
+    // preference order picks sourceAudioUrl — in the field that's now the
+    // real Suno CDN (cdn1.suno.ai), while audioUrl is the relay; both are
+    // unauthenticated-fetchable (APEX's download landed clean)
+    assert_eq!(
+        t.audio_url.as_deref(),
+        Some("https://cdn1.suno.ai/5912d65c-2dbc-4612-951f-71315ac48d83.mp3")
+    );
+    assert_eq!(t.duration, Some(207.48));
+    assert!(t.tags.as_deref().unwrap().contains("synthwave"));
+    assert_eq!(info.tracks[1].duration, Some(189.76));
 }
 
 #[test]
