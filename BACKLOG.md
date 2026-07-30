@@ -17,16 +17,27 @@ field verification. Contract: `docs/hermes-parity.md`.
       statvfs disk guard, keyless CDN client.
 - [x] **S3 — sonus-mcp** (PR #3): stdio JSON-RPC server, 16 hermes-parity
       tools (7 core + 9 honest not-yets), agentd-posture stdio smokes.
-- [ ] **S4 — live-fire integration**: APEX's first real compose on apex-3 is
-      the counted run (`check_credits` first); capture the real record-info
-      JSON into the fixture set (curl with the node key, task_id from APEX).
+- [x] **S4 — live-fire integration** ✅ (2026-07-30, PR #7): APEX's first real
+      compose WAS the counted run — task `bb69b305b057…801c`, "Same Voice,
+      New Bones". Verbatim record-info captured as
+      `record_info_success_live.json` + a field-for-field test; parity doc
+      gained the live-capture addendum (cdn1.suno.ai URL shift, UPPERCASE
+      status, `data.param` echo). Optional top-up parked below: a real
+      unhappy-path capture (APEX offered).
 - [x] **S5 — ApexOS integration** (PR #4 + ApexOS-RS #302/#303): env-file
       fallback, `sonus_provision()`, `/etc/sonus/env`, stanza swap, policy
       seeds, `apexos-update --sonus` flag path.
-- [ ] **S6 — cutover + field**: apex-3 INSTALLED via `--sonus` (2026-07-30) ✓;
-      remaining: APEX composes through it (zero soul churn), files visible in
-      the 🎵 app + SCORE picker, python venv retired. Field finale: compose →
-      SCORE → the Cutting Room renders a scored cut on an all-Rust pipeline.
+- [x] **S6 — cutover + field** ✅ (2026-07-30): apex-3 installed via the
+      `--sonus` oneliner; APEX composed through the new plumbing with ZERO
+      soul churn ("no different at the tool-call layer, which is exactly the
+      point" — its words); both variants in the 🎵 app with hermes filenames;
+      finale rendered: `workspace/film/same_voice_new_bones_teaser.mp4`
+      (−14.74 LUFS, no clipping) — compose → footage → scored cut, all-Rust.
+      One seam found (not Sonus-RS): craft_video's `music` slot needs an
+      in-library job_id — APEX muxed via ffmpeg + stored Cerebro procedure
+      `e5d9e01a-ac14-41fc-808e-ff65d5c58732`; fix parked below.
+      Footnote: the legacy python venv (`/opt/sonus`) still awaits deletion
+      on the old node — hygiene, not function.
 
 ## v0.2 — the standalone arc (queued 2026-07-30, behind the S4/S6 stamp)
 
@@ -63,5 +74,11 @@ frontend (Leptos/Yew) only if something ever needs a real-time canvas.
 ## Post-v1 parking
 
 Extended tools (album/stems/voice/wav/video/sfx) as demand pulls; upload_audio
-(`SUNO_FILE_API_BASE`); MCP audio hand-off to Imaginarium (frame-cap aware);
+(`SUNO_FILE_API_BASE`); **MCP audio hand-off to Imaginarium** (frame-cap
+aware) — now field-evidenced: craft_video rejected a raw Sonus mp3 path in
+APEX's finale run ("no local media for music job_id"), workaround = ffmpeg
+mux (Cerebro procedure `e5d9e01a-ac14-41fc-808e-ff65d5c58732`); the fix is
+Imaginarium-side (an `imaginarium_audio_import` tool or a path-accepting
+`music` slot); a real unhappy-path fixture capture (APEX offered to compose
+a deliberate failure / timeout-then-resume — cheap, a few credits);
 Nano field test on a Zero 2W (the whole point — measure RSS and boast).
