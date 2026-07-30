@@ -34,6 +34,17 @@ pub enum SonusError {
     /// A response we couldn't make sense of.
     #[error("unexpected response shape: {0}")]
     Shape(String),
+    /// Local filesystem failure (download dir, .part file, rename).
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
+    /// The disk guard refused a download — honest node-health signal, not
+    /// a masked write failure halfway through.
+    #[error("disk guard: need ~{needed_mb} MB but only {available_mb} MB free in {dir}")]
+    DiskFull {
+        needed_mb: u64,
+        available_mb: u64,
+        dir: String,
+    },
 }
 
 impl SonusError {
@@ -58,7 +69,8 @@ impl SonusError {
             SonusError::Api { code, .. } => {
                 !(matches!(code, 405 | 430 | 455) || *code >= 500 || *code == 0)
             }
-            SonusError::Http(_) | SonusError::Shape(_) => false,
+            SonusError::Http(_) | SonusError::Shape(_) | SonusError::Io(_) => false,
+            SonusError::DiskFull { .. } => true,
         }
     }
 }
