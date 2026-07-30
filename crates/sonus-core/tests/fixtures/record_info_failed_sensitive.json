@@ -1,0 +1,10 @@
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "taskId": "ae2ad3f9fabcdee05de4deca2e521d9d",
+    "status": "SENSITIVE_WORD_ERROR",
+    "errorMessage": "prompt contains blocked words",
+    "response": null
+  }
+}

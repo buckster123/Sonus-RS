@@ -6,7 +6,7 @@ field verification. Contract: `docs/hermes-parity.md`.
 - [x] **S0 — bootstrap** (2026-07-30): workspace scaffold, CLAUDE.md, parity
       contract extracted from hermes-sonus-v2, CI (fmt/clippy/test/build),
       compiling skeleton with config + type stubs.
-- [ ] **S1 — the suno client** (`sonus-core`): config/env resolution, Bearer
+- [ ] **S1 — the suno client** *(built 2026-07-30, in review)* (`sonus-core`): config/env resolution, Bearer
       client, `POST /generate` + `GET /generate/record-info` + `GET
       /generate/credit`, typed task lifecycle (submitted → pending → complete
       → files), captured-JSON fixture tests, resumable-timeout semantics.

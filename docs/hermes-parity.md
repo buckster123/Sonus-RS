@@ -71,3 +71,51 @@ Extended surface (post-v1 unless demand pulls them forward — an honest
   (reqwest + serde + tokio; think before every `cargo add`).
 - Playback/EEG/dashboard concerns from hermes do NOT come along; ApexOS-RS
   owns playback already (`/api/sonus/*`).
+
+## S1 wire truth (deep extraction, 2026-07-30)
+
+Verified against the full hermes source + a real captured V5 run
+(2026-04-25, `~/.hermes/sonus/music/tasks.json`):
+
+- **Envelope**: `{code, msg, data}`; success is **`code == 200` inside the
+  body**, never the HTTP status line. Error bodies still parse as envelopes.
+- **Body-code table** (their docs): 400 invalid params · 401 unauthorized ·
+  404 wrong path · **405 rate limit** (20 req/10 s) · 413 prompt too long ·
+  **429 insufficient credits** · **430 call frequency** · 455 maintenance ·
+  500 server error. Note the 405/429 trap.
+- **Generate body** (camelCase): always `customMode/instrumental/model/
+  callBackUrl`; custom mode adds `style`(if set), `title` (**always, `""`
+  when unset**), `prompt` (lyrics — sent even when instrumental, hermes'
+  deliberate deviation), `negativeTags`; simple mode adds ONLY `prompt`.
+  Sliders `weirdnessConstraint`/`styleWeight` are 0–1 floats, 2 decimals;
+  `vocalGender` (`"m"|"f"`) only when not instrumental.
+- **Statuses** (normalized lowercase): `pending` → `text_success` →
+  `first_success` → `success`; failures `create_task_failed`,
+  `generate_audio_failed`, `callback_exception`, `sensitive_word_error`.
+  No status token but tracks present ⇒ complete (the fallback real hermes
+  runs actually completed through).
+- **Track list location**: `data.response.sunoData` → `response.data` →
+  `sunoData` → `tracks` → `data` (first array wins). Track ids are dashed
+  UUIDs; task ids are 32-hex dashless; durations are floats; audio lands on
+  the `tempfile.aiquickdraw.com` relay CDN (unauthenticated download,
+  **15-day retention**).
+- **Poll schedule**: 5 s → ×1.5 → cap 30 s.
+
+## Rust-side deliberate divergences (S1)
+
+1. **Failure statuses are terminal.** hermes never recognizes the four
+   documented failure statuses — a failed task polls until timeout. We flip
+   to `Failed(reason)` immediately.
+2. **`callBackUrl: "https://localhost/callback"`** — required by schema,
+   never validated for reachability; the exact literal behind every real
+   successful hermes run. v1 is poll-only.
+3. **`sourceAudioUrl`-first** track-URL preference — the poll path's order
+   (the one real downloads went through); hermes' callback path disagrees.
+4. **No desktop-Chrome UA spoof** — the plain Bearer requests path is the
+   one real generations succeeded through; we keep headers honest.
+5. **Poll errors split transient/fatal**: 405/430/455/5xx/transport ride out
+   inside the resumable timeout; 400/401/404/413/429 surface immediately.
+   A timeout is an *outcome* (`PollOutcome::TimedOut` + last snapshot),
+   never an error — the task id stays resumable.
+6. **Tracks without a resolvable audio URL are kept** (`audio_url: None`)
+   instead of silently dropped; S2 reports them honestly.
