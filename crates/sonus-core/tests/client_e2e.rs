@@ -1,79 +1,18 @@
-//! Client tests against a dependency-free mini HTTP/1.1 mock: real sockets,
-//! real reqwest, canned bodies. One connection per queued response,
-//! `Connection: close` keeps it deterministic.
+//! Client tests over the shared mini HTTP mock (tests/common) — real
+//! reqwest, canned envelopes.
 
-use std::io::{Read, Write};
-use std::net::TcpListener;
-use std::sync::mpsc;
+mod common;
+
 use std::time::Duration;
 
+use common::{json, serve};
 use sonus_core::types::TaskStatus;
 use sonus_core::{Config, GenerateParams, PollOutcome, SonusError, SunoClient};
 
-/// Serve the queued (status, body) responses in order, one per connection.
-/// Returns the api_base to point the client at + a receiver yielding each
-/// raw request (head + body) for assertions.
-fn serve(responses: Vec<(u16, String)>) -> (String, mpsc::Receiver<String>) {
-    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
-    let addr = listener.local_addr().unwrap();
-    let (tx, rx) = mpsc::channel();
-    std::thread::spawn(move || {
-        for (status, body) in responses {
-            let Ok((mut sock, _)) = listener.accept() else {
-                return;
-            };
-            sock.set_read_timeout(Some(Duration::from_secs(2))).ok();
-            let mut buf = Vec::new();
-            let mut tmp = [0u8; 4096];
-            loop {
-                match sock.read(&mut tmp) {
-                    Ok(0) | Err(_) => break,
-                    Ok(n) => {
-                        buf.extend_from_slice(&tmp[..n]);
-                        if let Some(head_end) = find(&buf, b"\r\n\r\n") {
-                            let head = String::from_utf8_lossy(&buf[..head_end]);
-                            let cl = content_length(&head);
-                            if buf.len() >= head_end + 4 + cl {
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            tx.send(String::from_utf8_lossy(&buf).into_owned()).ok();
-            let reason = match status {
-                200 => "OK",
-                404 => "Not Found",
-                _ => "Error",
-            };
-            let resp = format!(
-                "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\n\
-                 Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
-                body.len()
-            );
-            sock.write_all(resp.as_bytes()).ok();
-        }
-    });
-    (format!("http://{addr}/api/v1"), rx)
-}
-
-fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack.windows(needle.len()).position(|w| w == needle)
-}
-
-fn content_length(head: &str) -> usize {
-    head.lines()
-        .find_map(|l| {
-            let (k, v) = l.split_once(':')?;
-            k.eq_ignore_ascii_case("content-length")
-                .then(|| v.trim().parse().ok())?
-        })
-        .unwrap_or(0)
-}
-
-fn client_for(base: &str) -> SunoClient {
+fn client_for(host: &str) -> SunoClient {
+    let base = format!("{host}/api/v1");
     let cfg = Config::resolve(|k| match k {
-        "SUNO_API_BASE" => Some(base.to_string()),
+        "SUNO_API_BASE" => Some(base.clone()),
         "SUNO_API_KEY" => Some("test-key-123".to_string()),
         _ => None,
     });
@@ -84,18 +23,12 @@ fn client_for(base: &str) -> SunoClient {
 
 #[tokio::test]
 async fn generate_then_poll_to_success() {
-    let (base, rx) = serve(vec![
-        (200, include_str!("fixtures/generate_ok.json").into()),
-        (
-            200,
-            include_str!("fixtures/record_info_pending.json").into(),
-        ),
-        (
-            200,
-            include_str!("fixtures/record_info_success.json").into(),
-        ),
+    let (host, rx) = serve(vec![
+        json(200, include_str!("fixtures/generate_ok.json")),
+        json(200, include_str!("fixtures/record_info_pending.json")),
+        json(200, include_str!("fixtures/record_info_success.json")),
     ]);
-    let client = client_for(&base);
+    let client = client_for(&host);
 
     let params = GenerateParams {
         custom_mode: true,
@@ -134,17 +67,11 @@ async fn generate_then_poll_to_success() {
 
 #[tokio::test]
 async fn poll_timeout_is_resumable_not_an_error() {
-    let (base, _rx) = serve(vec![
-        (
-            200,
-            include_str!("fixtures/record_info_pending.json").into(),
-        ),
-        (
-            200,
-            include_str!("fixtures/record_info_pending.json").into(),
-        ),
+    let (host, _rx) = serve(vec![
+        json(200, include_str!("fixtures/record_info_pending.json")),
+        json(200, include_str!("fixtures/record_info_pending.json")),
     ]);
-    let client = client_for(&base);
+    let client = client_for(&host);
     let outcome = client
         .poll_until_done(
             "ae2ad3f9fabcdee05de4deca2e521d9d",
@@ -164,8 +91,8 @@ async fn poll_timeout_is_resumable_not_an_error() {
 
 #[tokio::test]
 async fn fatal_poll_error_surfaces_immediately() {
-    let (base, _rx) = serve(vec![(200, r#"{"code":401,"msg":"unauthorized"}"#.into())]);
-    let client = client_for(&base);
+    let (host, _rx) = serve(vec![json(200, r#"{"code":401,"msg":"unauthorized"}"#)]);
+    let client = client_for(&host);
     let err = client
         .poll_until_done("deadbeef", Duration::from_secs(5))
         .await
@@ -175,11 +102,11 @@ async fn fatal_poll_error_surfaces_immediately() {
 
 #[tokio::test]
 async fn failed_generation_terminates_the_poll() {
-    let (base, _rx) = serve(vec![(
+    let (host, _rx) = serve(vec![json(
         200,
-        include_str!("fixtures/record_info_failed_sensitive.json").into(),
+        include_str!("fixtures/record_info_failed_sensitive.json"),
     )]);
-    let client = client_for(&base);
+    let client = client_for(&host);
     let outcome = client
         .poll_until_done("ae2ad3f9fabcdee05de4deca2e521d9d", Duration::from_secs(5))
         .await
@@ -201,8 +128,12 @@ async fn failed_generation_terminates_the_poll() {
 
 #[tokio::test]
 async fn credits_http_404_is_unknown() {
-    let (base, _rx) = serve(vec![(404, "<html>nope</html>".into())]);
-    let client = client_for(&base);
+    let (host, _rx) = serve(vec![common::Mock {
+        status: 404,
+        content_type: "text/html",
+        body: b"<html>nope</html>".to_vec(),
+    }]);
+    let client = client_for(&host);
     assert_eq!(
         client.credits().await.unwrap(),
         sonus_core::Credits::Unknown
@@ -211,11 +142,11 @@ async fn credits_http_404_is_unknown() {
 
 #[tokio::test]
 async fn credits_number_shape_over_the_wire() {
-    let (base, _rx) = serve(vec![(
+    let (host, _rx) = serve(vec![json(
         200,
-        include_str!("fixtures/credits_number.json").into(),
+        include_str!("fixtures/credits_number.json"),
     )]);
-    let client = client_for(&base);
+    let client = client_for(&host);
     assert_eq!(
         client.credits().await.unwrap(),
         sonus_core::Credits::Known {
