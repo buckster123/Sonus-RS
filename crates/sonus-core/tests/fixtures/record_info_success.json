@@ -1,0 +1,32 @@
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "taskId": "ae2ad3f9fabcdee05de4deca2e521d9d",
+    "status": "SUCCESS",
+    "response": {
+      "sunoData": [
+        {
+          "id": "e3dbbc69-043e-4da9-b5e0-05be9cbb4edd",
+          "title": "Trismegistus Fanfare",
+          "sourceAudioUrl": "https://tempfile.aiquickdraw.com/r/e219448d8f2d41d491a321766c7e38bd.mp3",
+          "streamAudioUrl": "https://tempfile.aiquickdraw.com/s/e219448d8f2d41d491a321766c7e38bd",
+          "imageUrl": "https://tempfile.aiquickdraw.com/r/e219448d8f2d41d491a321766c7e38bd.jpeg",
+          "duration": 168.6,
+          "tags": "orchestral cinematic mystical",
+          "prompt": "A short brassy alchemical fanfare, hermetic, bold, mystical, with golden chimes and stately drums, 30 seconds"
+        },
+        {
+          "id": "6042b621-014b-4e7f-bc06-92451632e90e",
+          "title": "Trismegistus Fanfare",
+          "sourceAudioUrl": "https://tempfile.aiquickdraw.com/r/d369f931c7c14d1399c492b860b7b50e.mp3",
+          "streamAudioUrl": "https://tempfile.aiquickdraw.com/s/d369f931c7c14d1399c492b860b7b50e",
+          "imageUrl": "https://tempfile.aiquickdraw.com/r/d369f931c7c14d1399c492b860b7b50e.jpeg",
+          "duration": 172.72,
+          "tags": "orchestral cinematic mystical",
+          "prompt": "A short brassy alchemical fanfare, hermetic, bold, mystical, with golden chimes and stately drums, 30 seconds"
+        }
+      ]
+    }
+  }
+}

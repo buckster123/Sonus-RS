@@ -1,0 +1,15 @@
+{
+  "code": 200,
+  "data": {
+    "response": {
+      "sunoData": [
+        {
+          "audioUrl": "https://example.com/audio.mp3",
+          "title": "Test Track",
+          "duration": 120,
+          "id": "clip_123"
+        }
+      ]
+    }
+  }
+}
