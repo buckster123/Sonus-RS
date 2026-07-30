@@ -26,4 +26,4 @@ pub use client::{PollOutcome, SunoClient};
 pub use config::Config;
 pub use error::SonusError;
 pub use library::{DownloadReport, Library, TrackFile};
-pub use types::{Credits, GenerateParams, RecordInfo, TaskStatus, Track};
+pub use types::{Credits, ExtendParams, GenerateParams, RecordInfo, TaskStatus, Track};
