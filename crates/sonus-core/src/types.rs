@@ -95,6 +95,58 @@ impl GenerateParams {
     }
 }
 
+/// A `POST /generate/extend` request (hermes' exact body: audioId/taskId/
+/// model/callBackUrl/continueAt always; prompt/style/title when non-empty).
+#[derive(Debug, Clone, Default)]
+pub struct ExtendParams {
+    /// The original generation task.
+    pub task_id: String,
+    /// The specific variant to extend (each task yields 2).
+    pub audio_id: String,
+    pub model: String,
+    /// Seconds into the original to extend from; 0 = continue from end.
+    pub continue_at: i64,
+    pub prompt: Option<String>,
+    pub style: Option<String>,
+    pub title: Option<String>,
+    pub callback_url: Option<String>,
+}
+
+impl ExtendParams {
+    pub fn body(&self) -> Value {
+        let mut b = Map::new();
+        b.insert("audioId".into(), json!(self.audio_id));
+        b.insert("taskId".into(), json!(self.task_id));
+        b.insert("model".into(), json!(self.model));
+        b.insert(
+            "callBackUrl".into(),
+            json!(self
+                .callback_url
+                .clone()
+                .unwrap_or_else(|| NULL_CALLBACK_URL.to_string())),
+        );
+        b.insert("continueAt".into(), json!(self.continue_at));
+        for (k, v) in [
+            ("prompt", &self.prompt),
+            ("style", &self.style),
+            ("title", &self.title),
+        ] {
+            if let Some(s) = nonempty(v) {
+                b.insert(k.into(), json!(s));
+            }
+        }
+        Value::Object(b)
+    }
+}
+
+/// `POST /lyrics` body — exactly two fields (hermes parity).
+pub fn lyrics_body(prompt: &str, callback_url: Option<&str>) -> Value {
+    json!({
+        "prompt": prompt,
+        "callBackUrl": callback_url.unwrap_or(NULL_CALLBACK_URL),
+    })
+}
+
 fn nonempty(s: &Option<String>) -> Option<String> {
     s.as_deref()
         .map(str::trim)
@@ -128,6 +180,18 @@ pub enum TaskStatus {
 impl TaskStatus {
     pub fn is_terminal(&self) -> bool {
         matches!(self, TaskStatus::Success | TaskStatus::Failed(_))
+    }
+
+    /// The lowercase status token the MCP surface reports (Failed/Unknown
+    /// carry their upstream token through unchanged).
+    pub fn as_token(&self) -> &str {
+        match self {
+            TaskStatus::Pending => "pending",
+            TaskStatus::TextSuccess => "text_success",
+            TaskStatus::FirstSuccess => "first_success",
+            TaskStatus::Success => "success",
+            TaskStatus::Failed(s) | TaskStatus::Unknown(s) => s,
+        }
     }
 }
 
@@ -452,6 +516,43 @@ mod tests {
         let b = p.body();
         assert_eq!(b["weirdnessConstraint"], json!(0.33));
         assert_eq!(b["styleWeight"], json!(1.0));
+    }
+
+    #[test]
+    fn extend_body_is_hermes_shape() {
+        let p = ExtendParams {
+            task_id: "ae2ad3f9fabcdee05de4deca2e521d9d".into(),
+            audio_id: "e3dbbc69-043e-4da9-b5e0-05be9cbb4edd".into(),
+            model: "V5".into(),
+            continue_at: 0,
+            style: Some("brass fanfare".into()),
+            ..Default::default()
+        };
+        let b = p.body();
+        assert_eq!(b["audioId"], json!("e3dbbc69-043e-4da9-b5e0-05be9cbb4edd"));
+        assert_eq!(b["taskId"], json!("ae2ad3f9fabcdee05de4deca2e521d9d"));
+        assert_eq!(b["continueAt"], json!(0));
+        assert_eq!(b["callBackUrl"], json!(NULL_CALLBACK_URL));
+        assert_eq!(b["style"], json!("brass fanfare"));
+        assert!(b.get("prompt").is_none() && b.get("title").is_none());
+    }
+
+    #[test]
+    fn lyrics_body_is_two_fields_exactly() {
+        let b = lyrics_body("a song about rust", None);
+        assert_eq!(b["prompt"], json!("a song about rust"));
+        assert_eq!(b["callBackUrl"], json!(NULL_CALLBACK_URL));
+        assert_eq!(b.as_object().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn status_tokens_round_trip() {
+        assert_eq!(TaskStatus::Pending.as_token(), "pending");
+        assert_eq!(TaskStatus::Success.as_token(), "success");
+        assert_eq!(
+            TaskStatus::Failed("sensitive_word_error".into()).as_token(),
+            "sensitive_word_error"
+        );
     }
 
     #[test]

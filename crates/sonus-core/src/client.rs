@@ -15,7 +15,7 @@ use serde_json::Value;
 
 use crate::config::Config;
 use crate::error::SonusError;
-use crate::types::{self, Credits, GenerateParams, RecordInfo};
+use crate::types::{self, Credits, ExtendParams, GenerateParams, RecordInfo};
 
 pub const INITIAL_POLL_INTERVAL: Duration = Duration::from_secs(5);
 pub const MAX_POLL_INTERVAL: Duration = Duration::from_secs(30);
@@ -90,6 +90,34 @@ impl SunoClient {
             )
             .await?;
         types::parse_record_info(&v)
+    }
+
+    /// Extend an existing track. SPENDS CREDITS like generate.
+    pub async fn extend(&self, params: &ExtendParams) -> Result<String, SonusError> {
+        let (_, v) = self
+            .send_json(
+                self.http
+                    .post(format!("{}/generate/extend", self.base))
+                    .json(&params.body()),
+            )
+            .await?;
+        types::parse_task_id(&v)
+    }
+
+    /// Lyrics-only generation (`POST /lyrics`). SPENDS CREDITS.
+    pub async fn lyrics(
+        &self,
+        prompt: &str,
+        callback_url: Option<&str>,
+    ) -> Result<String, SonusError> {
+        let (_, v) = self
+            .send_json(
+                self.http
+                    .post(format!("{}/lyrics", self.base))
+                    .json(&types::lyrics_body(prompt, callback_url)),
+            )
+            .await?;
+        types::parse_task_id(&v)
     }
 
     /// Remaining credits. Free — the spend gate.

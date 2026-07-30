@@ -12,7 +12,7 @@ field verification. Contract: `docs/hermes-parity.md`.
       → files), captured-JSON fixture tests, resumable-timeout semantics.
 - [ ] **S2 — download + library** *(built 2026-07-30, in review)*: track download into `SUNO_DOWNLOAD_DIR`,
       honest filenames, dedupe, disk-space guard.
-- [ ] **S3 — sonus-mcp**: stdio JSON-RPC server with the core-loop tools
+- [ ] **S3 — sonus-mcp** *(built 2026-07-30, in review)*: stdio JSON-RPC server with the core-loop tools
       (`generate_song`, `check_status`, `check_status_until_done`,
       `download_track`, `extend_track`, `generate_lyrics`, `check_credits`) —
       names/args per parity doc; extended tools return honest not-yet errors.
