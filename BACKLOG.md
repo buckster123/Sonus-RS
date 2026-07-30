@@ -20,7 +20,7 @@ field verification. Contract: `docs/hermes-parity.md`.
 - [ ] **S4 — live-fire integration**: one counted run against sunoapi.org with
       André's credits (`check_credits` first); capture real response JSON into
       the fixture set.
-- [ ] **S5 — ApexOS integration** (ApexOS-RS PR): `sonus_provision()` in
+- [ ] **S5 — ApexOS integration** *(built 2026-07-30 — this PR + ApexOS-RS #302, in review)* (ApexOS-RS PR): `sonus_provision()` in
       install.sh, `/etc/sonus/env` seeding, plugins.toml stanza swap
       python→rust, docs (imaginarium-pattern).
 - [ ] **S6 — cutover + field**: apex-3 runs Sonus-RS, APEX composes through it
