@@ -101,6 +101,23 @@ Verified against the full hermes source + a real captured V5 run
   **15-day retention**).
 - **Poll schedule**: 5 s → ×1.5 → cap 30 s.
 
+### Live-capture addendum (S4, 2026-07-30 — the field truth)
+
+From APEX's first real compose (`record_info_success_live.json` in the
+fixture set): `data.param` echoes the submitted body verbatim as a JSON
+string — production proof of the generate shape incl. the
+`https://localhost/callback` literal. `status` arrives UPPERCASE
+(`"SUCCESS"`). `errorCode`/`errorMessage` ride as explicit nulls on
+success. Per-track extras not in the hermes tables: `sourceImageUrl`,
+`modelName` (`"chirp-crow"` for V5), `createTime` (ms epoch).
+**URL layout shifted since the April run**: `sourceAudioUrl` = the real
+Suno CDN (`cdn1.suno.ai`), `audioUrl` = the relay
+(`tempfile.aiquickdraw.com`), `streamAudioUrl` = a third host
+(`musicfile.removeai.ai`). Our sourceAudioUrl-first preference therefore
+downloads from Suno's own CDN; both source and relay fetched
+unauthenticated in the field. Retention may differ per host — if
+downloads ever 403/404 on one, the fallback order has three more rungs.
+
 ## Rust-side deliberate divergences (S1)
 
 1. **Failure statuses are terminal.** hermes never recognizes the four
