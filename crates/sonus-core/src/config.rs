@@ -35,9 +35,53 @@ impl Config {
         }
     }
 
+    /// Process env first, then the node env file (`SONUS_ENV_FILE`, default
+    /// `/etc/sonus/env`). This is HOW key isolation works without a daemon:
+    /// there's no systemd EnvironmentFile reader here — the MCP child (agentd
+    /// user) self-loads the root:agentd 0640 file, so the key never has to
+    /// live in /etc/agentd/env or plugins.toml. An empty process var doesn't
+    /// shadow the file (the "add the key later" UX stays one-file).
     pub fn from_env() -> Self {
-        Self::resolve(|k| std::env::var(k).ok())
+        let path = std::env::var("SONUS_ENV_FILE")
+            .ok()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| DEFAULT_ENV_FILE.to_string());
+        let file_vars = std::fs::read_to_string(&path)
+            .map(|s| parse_env_file(&s))
+            .unwrap_or_default();
+        Self::resolve(|k| {
+            std::env::var(k)
+                .ok()
+                .filter(|v| !v.trim().is_empty())
+                .or_else(|| file_vars.get(k).cloned())
+        })
     }
+}
+
+pub const DEFAULT_ENV_FILE: &str = "/etc/sonus/env";
+
+/// KEY=VALUE lines; `#` comments and blanks skipped; whitespace trimmed;
+/// one layer of matching quotes stripped. No interpolation — it's an env
+/// file, not a shell script.
+fn parse_env_file(raw: &str) -> std::collections::HashMap<String, String> {
+    raw.lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                return None;
+            }
+            let (k, v) = line.split_once('=')?;
+            let k = k.trim();
+            let mut v = v.trim();
+            if v.len() >= 2
+                && ((v.starts_with('"') && v.ends_with('"'))
+                    || (v.starts_with('\'') && v.ends_with('\'')))
+            {
+                v = &v[1..v.len() - 1];
+            }
+            (!k.is_empty()).then(|| (k.to_string(), v.to_string()))
+        })
+        .collect()
 }
 
 /// Trim + drop a trailing slash; a bare host gets the /api/v1 suffix so both
@@ -105,5 +149,62 @@ mod tests {
             cfg(&[("SUNO_API_KEY", " k123 ")]).api_key.as_deref(),
             Some("k123")
         );
+    }
+
+    #[test]
+    fn env_file_parses_the_node_format() {
+        let vars = parse_env_file(
+            "# Sonus node env — the Suno key lives HERE and only here.\n\
+             SUNO_API_KEY=sk-abc123\n\
+             \n\
+             QUOTED=\"with spaces\"\n\
+             SINGLE='also fine'\n\
+             SPACED = padded \n\
+             =novalue\n\
+             not a kv line\n",
+        );
+        assert_eq!(
+            vars.get("SUNO_API_KEY").map(String::as_str),
+            Some("sk-abc123")
+        );
+        assert_eq!(vars.get("QUOTED").map(String::as_str), Some("with spaces"));
+        assert_eq!(vars.get("SINGLE").map(String::as_str), Some("also fine"));
+        assert_eq!(vars.get("SPACED").map(String::as_str), Some("padded"));
+        assert!(!vars.contains_key(""));
+        assert_eq!(vars.len(), 4);
+    }
+
+    #[test]
+    fn from_env_falls_back_to_the_file_but_process_wins() {
+        let dir = std::env::temp_dir().join(format!("sonus-env-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("env");
+        std::fs::write(
+            &file,
+            "SUNO_API_KEY=file-key\nSUNO_API_BASE=https://file.test\n",
+        )
+        .unwrap();
+
+        // isolate: point at our file, control the process env for this test
+        std::env::set_var("SONUS_ENV_FILE", &file);
+        std::env::remove_var("SUNO_API_KEY");
+        std::env::set_var("SUNO_API_BASE", "https://process.test");
+
+        let c = Config::from_env();
+        assert_eq!(c.api_key.as_deref(), Some("file-key"), "file fills the gap");
+        assert_eq!(
+            c.api_base, "https://process.test/api/v1",
+            "process env wins over the file"
+        );
+
+        // an EMPTY process var must not shadow the file
+        std::env::set_var("SUNO_API_KEY", "");
+        let c = Config::from_env();
+        assert_eq!(c.api_key.as_deref(), Some("file-key"));
+
+        std::env::remove_var("SONUS_ENV_FILE");
+        std::env::remove_var("SUNO_API_BASE");
+        std::env::remove_var("SUNO_API_KEY");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
